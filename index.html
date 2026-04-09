@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Maëlys Market et Tontine</title>
   <meta name="description" content="Gestion de tontine participative – Maëlys Market et Tontine">
-  <link rel="manifest" href="data:application/manifest+json,{name:'Maëlys Market et Tontine',short_name:'Maëlys Tontine',theme_color:'#0f766e',background_color:'#ffffff',display:'standalone',scope:'/',start_url:'/',icons:[{src:'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'%3E%3Ccircle cx=\'50\' cy=\'50\' r=\'45\' fill=\'%230f766e\'/%3E%3Ctext x=\'50\' y=\'70\' font-size=\'40\' text-anchor=\'middle\' fill=\'white\' font-family=\'Arial\'%3EM%26T%3C/text%3E%3C/svg%3E',sizes:'512x512',type:'image/svg+xml'}]}">
   <meta name="theme-color" content="#0f766e">
   <style>
     * { box-sizing: border-box; margin: 0; font-family: system-ui, 'Segoe UI', Roboto, sans-serif; }
@@ -39,6 +38,7 @@
     .contact-card { background: #e0f2fe; border-radius: 16px; padding: 12px 16px; margin-top: 16px; }
     .contact-link { color: #0369a1; text-decoration: none; font-weight: 500; }
     .error-banner { background: #fee2e2; color: #b91c1c; padding: 12px; border-radius: 12px; margin-bottom: 16px; }
+    .loading { text-align: center; padding: 40px; color: #64748b; }
   </style>
 </head>
 <body>
@@ -46,7 +46,7 @@
 <div class="container">
   <div class="flex-row" style="justify-content: space-between;">
     <h1>🛍️ Maëlys Market & Tontine <span class="badge" id="roleBadge">Participant</span></h1>
-    <button class="btn btn-outline btn-small" id="toggleAdminBtn" style="display:none;">🔓 Admin</button>
+    <button class="btn btn-outline btn-small" id="toggleAdminBtn">🔓 Admin</button>
   </div>
   <p id="currentMonthDisplay" style="color:#64748b; margin-bottom:8px;"></p>
   
@@ -59,19 +59,20 @@
       <a href="https://wa.me/22664200834" target="_blank" class="contact-link">64 20 08 34</a>
       <a href="https://wa.me/22671681791" target="_blank" class="contact-link">71 68 17 91</a>
     </div>
-    <div style="font-size:0.8rem; margin-top:6px; color:#475569;">(Préfixe +226 ajouté automatiquement)</div>
+    <div style="font-size:0.8rem; margin-top:6px; color:#475569;">(Cliquez pour WhatsApp)</div>
   </div>
 
   <div id="beneficiaryBox" class="beneficiary-card">
     <div style="font-weight:500; color:#065f46;">💰 Ce mois-ci, la cagnotte revient à :</div>
     <div style="font-size:1.8rem; font-weight:700; color:#0f172a;" id="currentBeneficiaryName">---</div>
-    <div style="margin-top:8px;">Montant total : <strong id="totalAmount">0</strong> €</div>
+    <div style="margin-top:8px;">Montant total : <strong id="totalAmount">0</strong> FCFA</div>
   </div>
 </div>
 
 <div class="container">
   <h2>📋 État des versements (mois en cours)</h2>
-  <table id="participantsTable">
+  <div id="loadingMessage" class="loading">Chargement des données...</div>
+  <table id="participantsTable" style="display:none;">
     <thead><tr><th>Participant</th><th>Statut</th><th>Dernier versement</th><th style="text-align:right;">Actions</th></tr></thead>
     <tbody id="tableBody"></tbody>
   </table>
@@ -102,13 +103,13 @@
     <label>Ajouter un participant</label>
     <div class="flex-row">
       <input type="text" id="newParticipantName" placeholder="Nom" style="flex:2;">
-      <input type="text" id="newParticipantPhone" placeholder="WhatsApp (ex: 22912345678)" style="flex:3;">
+      <input type="text" id="newParticipantPhone" placeholder="WhatsApp (ex: 75523259)" style="flex:3;">
       <button class="btn btn-primary btn-small" id="addParticipantBtn">Ajouter</button>
     </div>
-    <small>Format international avec indicatif (ex: 226XXXXXXXX)</small>
+    <small>Numéro sans le +226 (ex: 75523259)</small>
   </div>
   <div class="input-group">
-    <label>Montant mensuel par personne (€ ou FCFA)</label>
+    <label>Montant mensuel par personne (FCFA)</label>
     <input type="number" id="monthlyAmountInput" min="0" step="1000" value="10000">
     <button class="btn btn-small btn-outline" id="updateAmountBtn" style="margin-top:8px;">Mettre à jour</button>
   </div>
@@ -132,27 +133,20 @@
   import { getFirestore, doc, setDoc, updateDoc, onSnapshot, arrayUnion, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
   import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-  // ⚙️ REMPLACEZ PAR VOTRE CONFIGURATION FIREBASE
+  // Configuration Firebase
   const firebaseConfig = {
-  apiKey: "AIzaSyCYdA9oUSFIS6Q6kn6iWXibvqypZywx8v8",
-  authDomain: "pos-of-africa.firebaseapp.com",
-  databaseURL: "https://pos-of-africa-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "pos-of-africa",
-  storageBucket: "pos-of-africa.firebasestorage.app",
-  messagingSenderId: "887623442752",
-  appId: "1:887623442752:web:b26637aa1dd094b489daa5"
-};
+    apiKey: "AIzaSyCYdA9oUSFIS6Q6kn6iWXibvqypZywx8v8",
+    authDomain: "pos-of-africa.firebaseapp.com",
+    databaseURL: "https://pos-of-africa-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "pos-of-africa",
+    storageBucket: "pos-of-africa.firebasestorage.app",
+    messagingSenderId: "887623442752",
+    appId: "1:887623442752:web:b26637aa1dd094b489daa5"
+  };
 
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-  const auth = getAuth(app);
-
-  const TONTINE_DOC_ID = "tontinePrincipale";
-  const tontineRef = doc(db, "tontines", TONTINE_DOC_ID);
-  let monthlyAmount = 10000;
-
+  let app, db, auth;
   let isAdmin = false;
-  let useOfflineMode = false;
+  let monthlyAmount = 10000;
   let tontineData = {
     participants: [],
     currentBeneficiaryIndex: 0,
@@ -164,59 +158,75 @@
 
   const THANKS_MESSAGE = "Maëlys Market et Tontine vous remercie pour la confiance accordée !!";
 
-  // Auth anonyme
-  signInAnonymously(auth)
-    .then(() => console.log("✅ Auth OK"))
-    .catch((error) => {
-      console.error("❌ Auth error:", error);
+  // Initialisation Firebase
+  try {
+    app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+    auth = getAuth(app);
+    
+    signInAnonymously(auth)
+      .then(() => {
+        console.log("✅ Authentification Firebase réussie");
+        document.getElementById('firebaseErrorBanner').style.display = 'none';
+        startFirebaseSync();
+      })
+      .catch((error) => {
+        console.error("❌ Erreur d'authentification:", error);
+        document.getElementById('firebaseErrorBanner').style.display = 'block';
+        document.getElementById('firebaseErrorBanner').innerHTML = `
+          <strong>⚠️ Configuration Firebase requise :</strong><br>
+          1. Activez l'authentification anonyme dans Firebase Console > Authentication > Sign-in methods<br>
+          2. Créez une base de données Firestore en mode test<br>
+          <br>Détails: ${error.message}
+        `;
+        loadOfflineData();
+      });
+  } catch (error) {
+    console.error("Erreur d'initialisation:", error);
+    document.getElementById('firebaseErrorBanner').style.display = 'block';
+    document.getElementById('firebaseErrorBanner').innerHTML = `
+      <strong>⚠️ Erreur d'initialisation :</strong> ${error.message}<br>
+      Vérifiez votre configuration Firebase dans la console.
+    `;
+    loadOfflineData();
+  }
+
+  function startFirebaseSync() {
+    const TONTINE_DOC_ID = "tontinePrincipale";
+    const tontineRef = doc(db, "tontines", TONTINE_DOC_ID);
+    
+    onSnapshot(tontineRef, (docSnap) => {
+      document.getElementById('loadingMessage').style.display = 'none';
+      document.getElementById('participantsTable').style.display = 'table';
+      
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        tontineData = {
+          participants: data.participants || [],
+          currentBeneficiaryIndex: data.currentBeneficiaryIndex || 0,
+          currentMonth: data.currentMonth || new Date().toISOString().slice(0,7),
+          totalCycles: data.totalCycles || 0,
+          paymentsHistory: data.paymentsHistory || [],
+          monthlyAmount: data.monthlyAmount || 10000
+        };
+      } else {
+        // Créer le document initial
+        setDoc(tontineRef, tontineData);
+      }
+      monthlyAmount = tontineData.monthlyAmount;
+      if (isAdmin) document.getElementById('monthlyAmountInput').value = monthlyAmount;
+      renderUI();
+      saveOfflineSnapshot();
+    }, (error) => {
+      console.error("Firestore error:", error);
       document.getElementById('firebaseErrorBanner').style.display = 'block';
       document.getElementById('firebaseErrorBanner').innerHTML = `
-        <strong>⚠️ Erreur Firebase :</strong> ${error.message}<br>
-        <small>Activez l'authentification anonyme dans la console Firebase (Authentication > Sign-in methods > Anonymous).</small>
+        <strong>⚠️ Erreur Firestore :</strong> ${error.message}<br>
+        Vérifiez les règles de sécurité Firestore dans la console Firebase.
       `;
-      useOfflineMode = true;
       loadOfflineData();
     });
-
-  onAuthStateChanged(auth, (user) => {
-    const savedAdmin = localStorage.getItem('tontineAdmin') === 'true';
-    if (savedAdmin) {
-      isAdmin = true;
-      document.getElementById('roleBadge').textContent = 'Admin';
-      document.getElementById('adminPanel').style.display = 'block';
-    }
-    document.getElementById('toggleAdminBtn').style.display = 'inline-block';
-
-    if (!useOfflineMode && user) {
-      onSnapshot(tontineRef, (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          tontineData = {
-            participants: data.participants || [],
-            currentBeneficiaryIndex: data.currentBeneficiaryIndex || 0,
-            currentMonth: data.currentMonth || new Date().toISOString().slice(0,7),
-            totalCycles: data.totalCycles || 0,
-            paymentsHistory: data.paymentsHistory || [],
-            monthlyAmount: data.monthlyAmount || 10000
-          };
-        } else {
-          tontineData = {
-            participants: [],
-            currentBeneficiaryIndex: 0,
-            currentMonth: new Date().toISOString().slice(0,7),
-            totalCycles: 0,
-            paymentsHistory: [],
-            monthlyAmount: 10000
-          };
-          setDoc(tontineRef, tontineData);
-        }
-        monthlyAmount = tontineData.monthlyAmount;
-        if (isAdmin) document.getElementById('monthlyAmountInput').value = monthlyAmount;
-        renderUI();
-        saveOfflineSnapshot();
-      });
-    }
-  });
+  }
 
   function loadOfflineData() {
     const saved = localStorage.getItem('tontineOfflineBackup');
@@ -225,14 +235,26 @@
         tontineData = JSON.parse(saved);
         monthlyAmount = tontineData.monthlyAmount;
         renderUI();
-        showToast("Mode hors-ligne (données locales)");
+        showToast("Mode hors-ligne - données locales chargées");
       } catch (e) {}
     }
+    document.getElementById('loadingMessage').style.display = 'none';
+    document.getElementById('participantsTable').style.display = 'table';
   }
 
   function saveOfflineSnapshot() {
     localStorage.setItem('tontineOfflineBackup', JSON.stringify(tontineData));
   }
+
+  onAuthStateChanged(auth, (user) => {
+    if (!user) return;
+    const savedAdmin = localStorage.getItem('tontineAdmin') === 'true';
+    if (savedAdmin) {
+      isAdmin = true;
+      document.getElementById('roleBadge').textContent = 'Admin';
+      document.getElementById('adminPanel').style.display = 'block';
+    }
+  });
 
   document.getElementById('toggleAdminBtn').addEventListener('click', () => {
     if (!isAdmin) {
@@ -242,6 +264,7 @@
         localStorage.setItem('tontineAdmin', 'true');
         document.getElementById('roleBadge').textContent = 'Admin';
         document.getElementById('adminPanel').style.display = 'block';
+        renderAdminParticipantList();
         showToast("Mode Admin activé");
       } else {
         showToast("Mot de passe incorrect");
@@ -284,15 +307,16 @@
 
     const paidCount = tontineData.participants.filter(p => isParticipantPaid(p.id)).length;
     const total = paidCount * monthlyAmount;
-    document.getElementById('totalAmount').textContent = total.toLocaleString() + (monthlyAmount >= 1000 ? ' FCFA' : ' €');
+    document.getElementById('totalAmount').textContent = total.toLocaleString();
 
     const tbody = document.getElementById('tableBody');
     tbody.innerHTML = '';
     tontineData.participants.forEach((p, index) => {
       const paid = isParticipantPaid(p.id);
       const lastPayment = getLastPaymentDate(p.id);
-      const paidStatus = paid ? 'Payé ✅' : (isOverdue() ? 'Retard ❌' : 'En attente ⏳');
-      const statusClass = paid ? 'status-paid' : (isOverdue() ? 'status-late' : 'status-pending');
+      const isOverdue = new Date().getDate() > 10;
+      const paidStatus = paid ? 'Payé ✅' : (isOverdue ? 'Retard ❌' : 'En attente ⏳');
+      const statusClass = paid ? 'status-paid' : (isOverdue ? 'status-late' : 'status-pending');
       const row = document.createElement('tr');
       row.innerHTML = `
         <td>${p.name} ${index === tontineData.currentBeneficiaryIndex ? '🎁' : ''}</td>
@@ -318,13 +342,8 @@
     if (isAdmin) renderAdminParticipantList();
   }
 
-  function isOverdue() {
-    return new Date().getDate() > 10;
-  }
-
   async function togglePayment(participantId) {
     if (!isAdmin) return;
-    if (useOfflineMode) { showToast("Mode hors-ligne"); return; }
     const paid = isParticipantPaid(participantId);
     const newHistory = [...tontineData.paymentsHistory];
     if (paid) {
@@ -338,33 +357,34 @@
         date: Timestamp.now()
       });
       const participant = tontineData.participants.find(p => p.id === participantId);
-      if (participant) {
-        openWhatsApp(participant.phone, `✅ Votre versement de ${monthlyAmount} a bien été enregistré. ${THANKS_MESSAGE}`);
+      if (participant && participant.phone) {
+        openWhatsApp(participant.phone, `✅ Votre versement de ${monthlyAmount} FCFA a bien été enregistré. ${THANKS_MESSAGE}`);
       }
     }
+    const tontineRef = doc(db, "tontines", "tontinePrincipale");
     await updateDoc(tontineRef, { paymentsHistory: newHistory });
     showToast(paid ? 'Paiement annulé' : 'Paiement enregistré');
   }
 
-  // === ADMIN ACTIONS ===
-  document.getElementById('resetMonthBtn').addEventListener('click', async () => {
+  // Actions Admin
+  document.getElementById('resetMonthBtn')?.addEventListener('click', async () => {
     if (!isAdmin) return;
-    if (useOfflineMode) { showToast("Mode hors-ligne"); return; }
     if (!confirm('Passer au mois suivant ? Le bénéficiaire changera et les paiements seront réinitialisés.')) return;
     let nextIndex = (tontineData.currentBeneficiaryIndex + 1) % (tontineData.participants.length || 1);
     const newMonth = new Date();
     newMonth.setMonth(newMonth.getMonth() + 1);
+    const tontineRef = doc(db, "tontines", "tontinePrincipale");
     await updateDoc(tontineRef, {
       currentBeneficiaryIndex: nextIndex,
       currentMonth: newMonth.toISOString().slice(0,7),
-      totalCycles: tontineData.totalCycles + 1
+      totalCycles: tontineData.totalCycles + 1,
+      paymentsHistory: []
     });
     showToast('Nouveau mois démarré');
   });
 
-  document.getElementById('validateAllBtn').addEventListener('click', async () => {
+  document.getElementById('validateAllBtn')?.addEventListener('click', async () => {
     if (!isAdmin) return;
-    if (useOfflineMode) { showToast("Mode hors-ligne"); return; }
     const newHistory = [...tontineData.paymentsHistory];
     tontineData.participants.forEach(p => {
       if (!isParticipantPaid(p.id)) {
@@ -376,26 +396,27 @@
         });
       }
     });
+    const tontineRef = doc(db, "tontines", "tontinePrincipale");
     await updateDoc(tontineRef, { paymentsHistory: newHistory });
     showToast('Tous les participants sont marqués comme payés');
   });
 
-  document.getElementById('remindLateBtn').addEventListener('click', () => {
+  document.getElementById('remindLateBtn')?.addEventListener('click', () => {
     const late = tontineData.participants.filter(p => !isParticipantPaid(p.id));
     if (late.length === 0) return showToast('Aucun retardataire');
-    late.forEach(p => openWhatsApp(p.phone, `Bonjour ${p.name}, rappel pour le versement de la tontine (${monthlyAmount}). ${THANKS_MESSAGE}`));
+    late.forEach(p => openWhatsApp(p.phone, `Bonjour ${p.name}, rappel pour le versement de la tontine (${monthlyAmount} FCFA). ${THANKS_MESSAGE}`));
   });
 
-  document.getElementById('sendBeneficiaryAnnouncementBtn').addEventListener('click', () => {
+  document.getElementById('sendBeneficiaryAnnouncementBtn')?.addEventListener('click', () => {
     const ben = tontineData.participants[tontineData.currentBeneficiaryIndex];
     if (!ben) return;
     const total = tontineData.participants.filter(p => isParticipantPaid(p.id)).length * monthlyAmount;
-    const msg = `📢 *Maëlys Market et Tontine* : la cagnotte de ${total.toLocaleString()} ce mois revient à *${ben.name}* ! 🎉 ${THANKS_MESSAGE}`;
+    const msg = `📢 *Maëlys Market et Tontine* : la cagnotte de ${total.toLocaleString()} FCFA ce mois revient à *${ben.name}* ! 🎉 ${THANKS_MESSAGE}`;
     tontineData.participants.forEach(p => openWhatsApp(p.phone, msg));
   });
 
-  document.getElementById('sendPaymentReminderBtn').addEventListener('click', () => {
-    const msg = `💬 *Maëlys Market et Tontine* – Rappel : versement de ${monthlyAmount} attendu pour ce mois. ${THANKS_MESSAGE}`;
+  document.getElementById('sendPaymentReminderBtn')?.addEventListener('click', () => {
+    const msg = `💬 *Maëlys Market et Tontine* – Rappel : versement de ${monthlyAmount} FCFA attendu pour ce mois. ${THANKS_MESSAGE}`;
     tontineData.participants.forEach(p => openWhatsApp(p.phone, msg));
   });
 
@@ -403,7 +424,7 @@
     const month = tontineData.currentMonth;
     const date = new Date(month + '-01').toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
     let report = `📊 *RAPPORT TONTINE – Maëlys Market* - ${date}\n`;
-    report += `💰 Montant individuel : ${monthlyAmount}\n`;
+    report += `💰 Montant individuel : ${monthlyAmount} FCFA\n`;
     const paid = tontineData.participants.filter(p => isParticipantPaid(p.id));
     const unpaid = tontineData.participants.filter(p => !isParticipantPaid(p.id));
     report += `✅ Payé : ${paid.length}/${tontineData.participants.length}\n`;
@@ -418,12 +439,12 @@
     return report;
   }
 
-  document.getElementById('sendMonthlyReportBtn').addEventListener('click', () => {
+  document.getElementById('sendMonthlyReportBtn')?.addEventListener('click', () => {
     const report = generateMonthlyReport();
     tontineData.participants.forEach(p => openWhatsApp(p.phone, report));
   });
 
-  document.getElementById('generateReportBtn').addEventListener('click', () => {
+  document.getElementById('generateReportBtn')?.addEventListener('click', () => {
     const report = generateMonthlyReport();
     const box = document.createElement('div');
     box.className = 'report-box';
@@ -434,8 +455,7 @@
     showToast('Rapport généré');
   });
 
-  // Historique modal
-  document.getElementById('showHistoryBtn').addEventListener('click', () => {
+  document.getElementById('showHistoryBtn')?.addEventListener('click', () => {
     const modal = document.getElementById('historyModal');
     const content = document.getElementById('historyContent');
     const history = [...tontineData.paymentsHistory].sort((a,b) => (b.date?.seconds || 0) - (a.date?.seconds || 0));
@@ -444,19 +464,21 @@
       const participant = tontineData.participants.find(part => part.id === p.participantId);
       const name = participant?.name || 'Inconnu';
       const date = p.date ? new Date(p.date.seconds * 1000).toLocaleDateString('fr-FR') : 'Inconnue';
-      html += `<tr><td>${date}</td><td>${name}</td><td>${p.month}</td><td>${p.amount}</td></tr>`;
+      html += `<tr><td>${date}</td><td>${name}</td><td>${p.month}</td><td>${p.amount} FCFA</td></tr>`;
     });
     html += '</table>';
     if (history.length === 0) html = '<p>Aucun versement enregistré.</p>';
     content.innerHTML = html;
     modal.style.display = 'flex';
   });
-  document.getElementById('closeHistoryModal').addEventListener('click', () => {
+
+  document.getElementById('closeHistoryModal')?.addEventListener('click', () => {
     document.getElementById('historyModal').style.display = 'none';
   });
 
   function renderAdminParticipantList() {
     const container = document.getElementById('editParticipantsList');
+    if (!container) return;
     container.innerHTML = tontineData.participants.map((p) => `
       <div class="flex-row" style="margin-bottom:8px;">
         <span style="flex:2;">${p.name} (${getTotalPaidCount(p.id)} vers.)</span>
@@ -466,22 +488,21 @@
     `).join('');
     document.querySelectorAll('.remove-participant-btn').forEach(btn => {
       btn.addEventListener('click', async (e) => {
-        if (useOfflineMode) { showToast("Mode hors-ligne"); return; }
         const id = e.target.dataset.id;
         const newParts = tontineData.participants.filter(p => p.id !== id);
+        const tontineRef = doc(db, "tontines", "tontinePrincipale");
         await updateDoc(tontineRef, { participants: newParts });
         showToast("Participant supprimé");
       });
     });
   }
 
-  document.getElementById('addParticipantBtn').addEventListener('click', async () => {
+  document.getElementById('addParticipantBtn')?.addEventListener('click', async () => {
     if (!isAdmin) return;
-    if (useOfflineMode) { showToast("Mode hors-ligne"); return; }
     const name = document.getElementById('newParticipantName').value.trim();
     let phone = document.getElementById('newParticipantPhone').value.trim().replace(/\s+/g, '');
     if (!name || !phone) return showToast('Nom et téléphone requis');
-    if (!phone.match(/^[0-9]{10,14}$/)) return showToast('Format téléphone invalide (ex: 22912345678)');
+    if (!phone.match(/^[0-9]{8,12}$/)) return showToast('Format téléphone invalide (ex: 75523259)');
     
     const newParticipant = {
       id: Date.now().toString() + Math.random().toString(36).substr(2,4),
@@ -489,25 +510,27 @@
       phone,
       joinedAt: new Date().toISOString()
     };
+    const tontineRef = doc(db, "tontines", "tontinePrincipale");
     await updateDoc(tontineRef, { participants: arrayUnion(newParticipant) });
     document.getElementById('newParticipantName').value = '';
     document.getElementById('newParticipantPhone').value = '';
     showToast(`${name} ajouté(e)`);
   });
 
-  document.getElementById('updateAmountBtn').addEventListener('click', async () => {
+  document.getElementById('updateAmountBtn')?.addEventListener('click', async () => {
     if (!isAdmin) return;
-    if (useOfflineMode) { showToast("Mode hors-ligne"); return; }
     const newAmount = parseInt(document.getElementById('monthlyAmountInput').value);
     if (newAmount > 0) {
+      const tontineRef = doc(db, "tontines", "tontinePrincipale");
       await updateDoc(tontineRef, { monthlyAmount: newAmount });
-      showToast(`Montant mis à jour : ${newAmount}`);
+      showToast(`Montant mis à jour : ${newAmount} FCFA`);
     }
   });
 
   function openWhatsApp(phone, text) {
+    if (!phone) return;
     let fullPhone = phone;
-    if (!phone.startsWith('+') && !phone.startsWith('226')) {
+    if (!phone.startsWith('+')) {
       fullPhone = '226' + phone;
     }
     window.open(`https://wa.me/${fullPhone}?text=${encodeURIComponent(text)}`, '_blank');
@@ -519,8 +542,6 @@
     toast.classList.add('show');
     setTimeout(() => toast.classList.remove('show'), 3000);
   }
-
-  // Pas de Service Worker pour éviter l'erreur
 </script>
 </body>
 </html>
